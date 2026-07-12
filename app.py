@@ -264,10 +264,24 @@ with tab_carotid:
             lt_ica_ri = st.number_input("Lt-ICA RI", value=None, placeholder="目安: 0.66", step=0.02)
 
 # =========================================================
-# --- 3. 参照ガイドラインの選択 ---
+# --- 3. 参照ガイドラインの選択 (日本語表示＆自動推奨機能つき！) ---
 # =========================================================
 st.header("3. 参照・照合するガイドライン")
-st.caption("※全ファイルを一気に読むとAIの記憶容量を超過するため、患者さんの疾患に関連するガイドラインを3〜5個程度選んでください。")
+st.caption("※患者さんの既往歴や入力された検査数値に基づき、AIが最適なガイドラインを自動推奨（チェック）しています。必要に応じてタップで調整してください。")
+
+# 1. ユーザー指定の10ファイル完全対応！日本語表示マッピング辞書
+GUIDELINE_MAP = {
+    "echo.pdf": "💓 心エコー",
+    "valvular_heart.pdf": "🫀 弁膜症",
+    "heart_failure.pdf": "📕 心不全",
+    "atherosclerosis.pdf": "📙 動脈硬化",
+    "carotid_echo.pdf": "🩺 頸部エコー",
+    "stroke.pdf": "🧠 脳卒中",
+    "ckd.pdf": "📗 CKD (慢性腎臓病)",
+    "liver_cirrhosis.pdf": "🟤 肝硬変",
+    "hbv.pdf": "🦠 B型肝炎",
+    "hcv.pdf": "🦠 C型肝炎"
+}
 
 available_pdfs = []
 guidelines_dir = "guidelines"
@@ -275,12 +289,69 @@ if os.path.exists(guidelines_dir):
     available_pdfs = [f for f in os.listdir(guidelines_dir) if f.endswith(".pdf")]
 
 if available_pdfs:
-    default_selection = available_pdfs[:3] if len(available_pdfs) >= 3 else available_pdfs
+    # 2. 既往歴・検査数値から推奨PDFを自動セレクトする臨床ロジック
+    recommended_pdfs = []
+    
+    for pdf in available_pdfs:
+        # ① 心不全・心エコー
+        if pdf == "heart_failure.pdf":
+            if any(h in history_list for h in ["心不全", "虚血性心疾患(狭心症・心筋梗塞)", "心房細動", "高血圧"]) or (ef is not None and ef < 50.0):
+                recommended_pdfs.append(pdf)
+        elif pdf == "echo.pdf":
+            # 心エコーの数値や項目が何か1つでも入力されていれば推奨
+            if any(v is not None for v in [ef, aod, lad, ivs, lvpw, lvdd, lvds, sv, co, ci, mitral_e, mitral_a, lvot, d_time, e_e_prime]) or any(h in history_list for h in ["心不全", "虚血性心疾患(狭心症・心筋梗塞)", "心房細動", "高血圧"]):
+                recommended_pdfs.append(pdf)
+        
+        # ② 弁膜症
+        elif pdf == "valvular_heart.pdf":
+            # 逆流が中等度以上、または弁口面積・圧較差に入力がある場合、逸脱ありの場合
+            if any(r in ["中等度 (++)", "高度 (+++)"] for r in [ar, mr, pr, tr]) or any(v is not None for v in [as_area, lv_ao_pg, ms_area, la_lv_pg, mva, pht]) or prolapse == "あり (+)":
+                recommended_pdfs.append(pdf)
+                
+        # ③ 動脈硬化・頸部エコー
+        elif pdf == "atherosclerosis.pdf":
+            if any(h in history_list for h in ["脂質異常症", "高血圧", "2型糖尿病", "閉塞性動脈硬化症(ASO)", "虚血性心疾患(狭心症・心筋梗塞)", "脳卒中・TIA"]) or (ldl is not None and ldl >= 140) or (sys_bp is not None and sys_bp >= 140):
+                recommended_pdfs.append(pdf)
+        elif pdf == "carotid_echo.pdf":
+            # 頸動脈の数値や狭窄評価が入力されている場合
+            if any(v is not None for v in [cca_ed_ratio, plaque_score, rt_imt_max, lt_imt_max, rt_cca_vmax, lt_cca_vmax, rt_ica_vmax, lt_ica_vmax]) or stenosis is not None or plaque_echo is not None or any(h in history_list for h in ["脳卒中・TIA", "閉塞性動脈硬化症(ASO)"]):
+                recommended_pdfs.append(pdf)
+                
+        # ④ 脳卒中
+        elif pdf == "stroke.pdf":
+            if any(h in history_list for h in ["脳卒中・TIA", "心房細動", "高血圧"]) or (stenosis in ["中等度狭窄 (50-69%)", "高度狭窄 (≥70%)"]):
+                recommended_pdfs.append(pdf)
+                
+        # ⑤ CKD (慢性腎臓病)
+        elif pdf == "ckd.pdf":
+            if any(h in history_list for h in ["慢性腎臓病(CKD)", "高血圧", "2型糖尿病"]) or (egfr is not None and egfr < 60.0) or (cre is not None and cre >= 1.0) or (bun is not None and bun >= 20.0):
+                recommended_pdfs.append(pdf)
+                
+        # ⑥ 肝疾患 (肝硬変・B型肝炎・C型肝炎)
+        elif pdf == "liver_cirrhosis.pdf":
+            if any(h in history_list for h in ["肝硬変", "B型肝炎", "C型肝炎"]) or (plt is not None and plt <= 15.0) or (alb is not None and alb <= 3.5) or (t_bil is not None and t_bil >= 1.5) or pleural_eff is not None or pe is not None:
+                recommended_pdfs.append(pdf)
+        elif pdf == "hbv.pdf":
+            if "B型肝炎" in history_list or "肝硬変" in history_list or hbs_ag in ["陽性 (+)", "判定保留"] or (hbs_val is not None and hbs_val > 0):
+                recommended_pdfs.append(pdf)
+        elif pdf == "hcv.pdf":
+            if "C型肝炎" in history_list or "肝硬変" in history_list or hcv_ab in ["陽性 (+)", "判定保留"] or (hcv_idx is not None and hcv_idx >= 1.0):
+                recommended_pdfs.append(pdf)
+
+    # 該当ルールが一つもない（またはまだ何も入力していない）場合は、デフォルトで最初の3個を選択
+    if not recommended_pdfs:
+        recommended_pdfs = available_pdfs[:3] if len(available_pdfs) >= 3 else available_pdfs
+
+    # 3. 日本語化＆自動推奨付きのセレクトボックス
     selected_pdfs = st.multiselect(
         "📚 AIに照合させるガイドラインを選択 (複数タップ可能)",
         options=available_pdfs,
-        default=default_selection
+        default=list(set(recommended_pdfs)), # 重複を除いてデフォルト設定
+        format_func=lambda x: GUIDELINE_MAP.get(x, x) # ←【神機能】ここで英語を日本語に変換！
     )
+    
+    if recommended_pdfs:
+        st.info(f"💡 **AI自動推奨システム稼働中**: ご入力いただいた既往歴や検査数値に基づいて、最適なガイドライン **{len(set(recommended_pdfs))}個** を自動選択しました。")
 else:
     selected_pdfs = []
     st.warning("⚠️ guidelinesフォルダ内にPDFファイルが見つかりません。")
