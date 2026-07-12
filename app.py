@@ -55,14 +55,14 @@ with tab_echo:
     st.subheader("心臓超音波検査 (Echo)")
     st.caption("※検査した項目のみ数値を入力してください。未入力の欄は裏に薄文字の目安が表示されます。")
     
-    with st.expander("➕ AoD・LAD 欄", expanded=True):
+    with st.expander("➕ AoD・LAD", expanded=True):
         c_aod1, c_aod2 = st.columns(2)
         with c_aod1:
             aod = st.number_input("AoD (mm)", value=None, placeholder="目安: 30.0", step=1.0)
         with c_aod2:
             lad = st.number_input("LAD (mm)", value=None, placeholder="目安: 35.0", step=1.0)
 
-    with st.expander("➕ Mitral valve 欄 (DDR, Prolapse, SAM)"):
+    with st.expander("➕ Mitral valve (DDR, Prolapse, SAM)"):
         c_mv1, c_mv2, c_mv3 = st.columns(3)
         with c_mv1:
             ddr = st.selectbox("DDR", ["正常・良好", "低下", "著明低下"], index=None, placeholder="選択なし")
@@ -71,7 +71,7 @@ with tab_echo:
         with c_mv3:
             sam = st.selectbox("SAM", ["なし (-)", "あり (+)"], index=None, placeholder="選択なし")
 
-    with st.expander("➕ LV size function 欄 (IVS, LVPW, LVDd/s, SV, Co, CI, HR, EF, FS)"):
+    with st.expander("➕ LV size function (IVS, LVPW, LVDd/s, SV, Co, CI, HR, EF, FS)"):
         c_lv1, c_lv2 = st.columns(2)
         with c_lv1:
             ivs = st.number_input("IVS Thickness (mm)", value=None, placeholder="目安: 10.0", step=0.5)
@@ -86,7 +86,7 @@ with tab_echo:
             ef = st.number_input("EF (%)", value=None, placeholder="目安: 60.0", step=1.0)
             fs = st.number_input("FS (%)", value=None, placeholder="目安: 35.0", step=1.0)
 
-    with st.expander("➕ Doppler Measurements Flow Velocity 欄 (E, A, E/A, D-time, E/E', LVOT)"):
+    with st.expander("➕ Doppler Measurements Flow Velocity (E, A, E/A, D-time, E/E', LVOT)"):
         c_dop1, c_dop2 = st.columns(2)
         with c_dop1:
             mitral_e = st.number_input("Mitral E (m/s)", value=None, placeholder="目安: 0.70", step=0.05)
@@ -97,7 +97,7 @@ with tab_echo:
             e_e_prime = st.number_input("E/E'", value=None, placeholder="目安: 8.8", step=0.5)
             lvot = st.number_input("LVOT (m/s)", value=None, placeholder="目安: 1.00", step=0.05)
 
-    with st.expander("➕ Regurgitation 欄 (逆流・狭窄・弁口面積等)"):
+    with st.expander("➕ Regurgitation (逆流・狭窄・弁口面積等)"):
         c_reg1, c_reg2 = st.columns(2)
         with c_reg1:
             ar = st.selectbox("AR", ["なし/極軽度 (-)", "軽度 (+)", "中等度 (++)", "高度 (+++)"], index=None, placeholder="選択なし")
@@ -112,7 +112,7 @@ with tab_echo:
             la_lv_pg = st.number_input("LA-LVPG (mmHg)", value=None, placeholder="目安: 5.0", step=1.0)
             mva = st.number_input("MVA (cm²)", value=None, placeholder="目安: 4.0", step=0.1)
 
-    with st.expander("➕ その他 欄 (心内血栓, PE, 呼吸変動, 胸水, IVC径)"):
+    with st.expander("➕ その他 (心内血栓, PE, 呼吸変動, 胸水, IVC径)"):
         c_oth1, c_oth2 = st.columns(2)
         with c_oth1:
             thrombus = st.selectbox("心内血栓", ["なし (-)", "あり (+)"], index=None, placeholder="選択なし")
