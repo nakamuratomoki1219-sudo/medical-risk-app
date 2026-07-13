@@ -265,13 +265,54 @@ with tab_carotid:
             lt_ica_ri = st.number_input("Lt-ICA RI", value=None, placeholder="目安: 0.66", step=0.02)
 
 # =========================================================
-# タブ4：薬剤情報 (新規追加！)
+# タブ4：薬剤情報 (AIクイック検索機能 ＆ 服用中セレクト！)
 # =========================================================
 with tab_med:
-    st.subheader("💊 現在処方されている主要薬剤グループ")
-    st.caption("※患者さんが服用中の薬剤グループを選択してください。Step2で安全・副作用・電解質リスクをAIが照合します。")
+    st.subheader("💊 薬剤情報・リスク管理")
+    
+    # --- 【新機能】AI薬剤辞書・クイック検索コーナー ---
+    with st.expander("🔍 【AI薬剤辞書】薬効・用量調整・臨床リスクをクイック検索", expanded=True):
+        st.caption("薬の名前（商品名・一般名どちらでも可）を入力すると、現場で知りたい注意点をAIが即座にまとめます。")
+        c_srch1, c_srch2 = st.columns([3, 1])
+        with c_srch1:
+            search_drug_name = st.text_input("検索したい薬剤名を入力", placeholder="例: リクシアナ、アミオダロン、ロキソニン、エンペドラ等", label_visibility="collapsed")
+        with c_srch2:
+            btn_drug_search = st.button("🔍 薬効・リスク検索", use_container_width=True)
+            
+        if btn_drug_search:
+            if not api_key:
+                st.error("⚠️ APIキーが設定されていません。")
+            elif not search_drug_name:
+                st.warning("⚠️ 検索したい薬の名前を入力してください。")
+            else:
+                with st.spinner(f"🔍 「{search_drug_name}」の薬理プロファイルと臨床注意点を検索中..."):
+                    try:
+                        client_search = genai.Client(api_key=api_key)
+                        drug_prompt = f"""
+                        あなたは豊富な知識を持つ臨床薬理の専門家および病棟薬剤師です。
+                        臨床従事者が現場で素早く確認できるよう、以下の薬剤「{search_drug_name}」について、単なる説明書ではなく「臨床リスク管理に直結する要点」を簡潔にまとめ、以下の4つの見出し(Markdown)で出力してください。
+                        ※商品名が入力された場合はその一般名・薬効を、一般名の場合は代表的な商品名を補足してください。
+
+                        ### 1. 💊 基本プロファイル（一般名 / 代表的商品名 / 薬効クラス・主な効能）
+                        ### 2. ⚠️ 腎機能(eGFR)・肝機能に伴う用量調整・慎重投与・禁忌基準
+                        ### 3. 🚨 高齢者・心血管疾患患者における主な副作用リスク（転倒、出血、電解質異常、血圧低下等）
+                        ### 4. 📈 臨床で監視すべき必須モニタリング項目（血液検査値・バイタルサイン・自覚症状）
+                        """
+                        res_drug = client_search.models.generate_content(
+                            model="gemini-3.5-flash",
+                            contents=[drug_prompt]
+                        )
+                        st.info(f"💡 **「{search_drug_name}」のAI臨床薬理プロファイル**")
+                        st.markdown(res_drug.text)
+                        st.markdown("---")
+                    except Exception as e:
+                        st.error(f"❌ 検索中にエラーが発生しました: {e}")
+
+    # --- これまで通りのアセスメント用・服用中薬剤選択 ---
+    st.markdown("##### 📋 統合アセスメント(Step2)用の服用中薬剤登録")
+    st.caption("※患者さんが現在服用中の薬剤グループを選択してください。下部のStep2実行時にAIが病態と照合します。")
     meds_list = st.multiselect(
-        "服用中の薬剤 (複数選択可)",
+        "服用中の主要薬剤グループ (複数選択可)",
         [
             "ACE阻害薬 / ARB / ARNI", "β遮断薬", "MRA (ミネラルコルチコイド受容体拮抗薬)",
             "ループ利尿薬 / サイアジド系", "SGLT2阻害薬", "DOAC (直接経口抗凝固薬)",
@@ -279,7 +320,7 @@ with tab_med:
         ]
     )
     meds_memo = st.text_input("気になる併用薬・用量・直近の変更等があれば記載 (任意)", placeholder="例: 直近でビソプロロール0.625mg開始、スピロノラクトン増量")
-
+    
 # =========================================================
 # タブ5：運動・リハビリ情報 (新規追加！)
 # =========================================================
@@ -415,7 +456,7 @@ if st.button("🚀 Step 1: 病態生理・リスクアセスメントを実行",
 
                 【血液・生化学検査】
                 総蛋白={fmt(tp,'g/dL')}, A/G={fmt(ag_ratio)}, Alb={fmt(alb,'g/dL')}, BUN={fmt(bun,'mg/dL')}, Cre={fmt(cre,'mg/dL')}, eGFR={fmt(egfr)}, 尿酸={fmt(ua,'mg/dL')}, LDL={fmt(ldl,'mg/dL')}, HDL={fmt(hdl,'mg/dL')}, TG={fmt(tg,'mg/dL')}, T-Bil={fmt(t_bil,'mg/dL')}, AST={fmt(ast,'U/L')}, ALT={fmt(alt,'U/L')}, ALP={fmt(alp,'U/L')}, γ-GT={fmt(ggt,'U/L')}, LD={fmt(ld,'U/L')}, CK={fmt(ck,'U/L')}, アミラーゼ={fmt(amylase,'U/L')}, Na={fmt(na,'mEq/L')}, K={fmt(k,'mEq/L')}, Cl={fmt(cl,'mEq/L')}, Ca={fmt(ca,'mg/dL')}, 血糖(空腹時)={fmt(fbs,'mg/dL')}, CRP={fmt(crp,'mg/dL')}, WBC={fmt(wbc,'/μL')}, RBC={fmt(rbc,'万/μL')}, Hb={fmt(hb,'g/dL')}, Ht={fmt(ht,'%')}, MCV={fmt(mcv,'fL')}, MCH={fmt(mch,'pg')}, MCHC={fmt(mchc,'%')}, PLT={fmt(plt,'万/μL')}, 好塩基球={fmt(baso,'%')}, 好酸球={fmt(eosino,'%')}, リンパ球={fmt(lympho,'%')}, 単球={fmt(mono,'%')}, 好中球={fmt(neutro,'%')}, LAP={fmt(lap,'U/L')}, ChE={fmt(che,'U/L')}, D-Bil={fmt(d_bil,'mg/dL')}, RPR={fmt(rpr)}, TP抗体={fmt(tp_ab)}, HBs抗原={fmt(hbs_ag)} (定量値:{fmt(hbs_val,'IU/mL')}), HCV抗体={fmt(hcv_ab)} (IDX/Unit:{fmt(hcv_idx)})
-                
+
                 【頸動脈超音波検査】
                 CCA ED ratio={fmt(cca_ed_ratio)}, Plaque Score={fmt(plaque_score)}, 所見={fmt(plaque_echo)}, 狭窄度={fmt(stenosis)}, Rt-IMT最大={fmt(rt_imt_max)}, Lt-IMT最大={fmt(lt_imt_max)}, Rt-ICA Vmax={fmt(rt_ica_vmax)}, Lt-ICA Vmax={fmt(lt_ica_vmax)}
 
