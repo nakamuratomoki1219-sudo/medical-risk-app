@@ -265,69 +265,111 @@ with tab_carotid:
             lt_ica_ri = st.number_input("Lt-ICA RI", value=None, placeholder="目安: 0.66", step=0.02)
 
 # =========================================================
-# タブ4：薬剤情報 (AIクイック検索機能 ＆ 服用中セレクト！)
+# タブ4：薬剤情報 (複数検索＆Step2主要グループへ自動振り分け！)
 # =========================================================
 with tab_med:
     st.subheader("💊 薬剤情報・リスク管理")
     
-    # --- 【新機能】AI薬剤辞書・クイック検索コーナー ---
-    with st.expander("🔍 【AI薬剤辞書】薬効・用量調整・臨床リスクをクイック検索", expanded=True):
-        st.caption("薬の名前（商品名・一般名どちらでも可）を入力すると、現場で知りたい注意点をAIが即座にまとめます。")
+    # 12の主要薬剤グループを定数として定義
+    DRUG_GROUPS = [
+        "ACE阻害薬 / ARB / ARNI", "β遮断薬", "MRA (ミネラルコルチコイド受容体拮抗薬)",
+        "ループ利尿薬 / サイアジド系", "SGLT2阻害薬", "DOAC (直接経口抗凝固薬)",
+        "ワルファリン", "抗血小板薬 (アスピリン/クロピドグレル等)", "スタチン / 脂質低下薬", "ジギタリス製剤", "抗不整脈薬", "NSAIDs (解熱鎮痛剤)"
+    ]
+    
+    # Streamlitのセッション記憶を初期化（自動チェック連携用）
+    if "selected_med_groups" not in st.session_state:
+        st.session_state["selected_med_groups"] = []
+
+    # --- AI薬剤辞書・複数検索＆自動振り分けコーナー ---
+    with st.expander("🔍 【AI薬剤辞書】複数薬剤のクイック検索 ＆ グループ自動分類", expanded=True):
+        st.caption("「、」やスペース等で区切って複数の薬名を入力できます。結果を簡潔に表示し、下部の主要薬剤グループへ自動で振り分けます。")
         c_srch1, c_srch2 = st.columns([3, 1])
         with c_srch1:
-            search_drug_name = st.text_input("検索したい薬剤名を入力", placeholder="例: リクシアナ、アミオダロン、ロキソニン、エンペドラ等", label_visibility="collapsed")
+            search_drug_names = st.text_input("検索したい薬剤名を入力 (複数可)", placeholder="例: リクシアナ、ペンライブ、メインテート、ロキソニン等", label_visibility="collapsed")
         with c_srch2:
-            btn_drug_search = st.button("🔍 薬効・リスク検索", use_container_width=True)
+            btn_drug_search = st.button("🔍 複数検索＆自動分類", use_container_width=True)
             
         if btn_drug_search:
             if not api_key:
                 st.error("⚠️ APIキーが設定されていません。")
-            elif not search_drug_name:
+            elif not search_drug_names:
                 st.warning("⚠️ 検索したい薬の名前を入力してください。")
             else:
-                with st.spinner(f"🔍 「{search_drug_name}」の薬理プロファイルと臨床注意点を検索中..."):
+                with st.spinner(f"🔍 「{search_drug_names}」の薬理プロファイルとグループ分類を推論中..."):
                     try:
                         client_search = genai.Client(api_key=api_key)
+                        group_list_str = "、".join(DRUG_GROUPS)
                         
-                        # AIの「勝手な自己補正・変換」をストップさせる厳密ガードレール付きプロンプト！
+                        # 複数検索＆2項目絞り込み＆自動分類プロンプト！
                         drug_prompt = f"""
                         あなたは日本国内の医療用医薬品に精通した臨床薬理の専門家および病棟薬剤師です。
-                        以下の検索ワード「{search_drug_name}」について、単なる説明書ではなく「現場の臨床リスク管理に直結する要点」を簡潔にまとめ、以下の4つの見出し(Markdown)で出力してください。
+                        ユーザーから入力された以下の薬剤リスト（「、」やスペース等で区切られた複数の薬名）について、それぞれの基本プロファイルと副作用を簡潔にまとめ、さらに指定の主要薬剤グループへの自動分類を行ってください。
 
-                        【🚨 最重要の検索・回答ルール (厳格に遵守すること)】
-                        1. **勝手な名称補正・変換の絶対禁止:** 入力された文字の響きが他の有名薬と似ていても、決して勝手に別の薬（例：「ペンライブ」を「プレガバリン」と勘違いする等）に置き換えないでください。
-                        2. **輸液・注射薬の完全網羅:** 内服薬だけでなく、点滴輸液（維持液・開始液・電解質輸液など。例：「ペンライブ」＝ペンライブ注/マルトース加酢酸維持液）、注射薬、外用薬も正確に検索対象としてください。「〜注」などの接尾辞が省略されていても正確に同定してください。
-                        3. 商品名が入力された場合はその一般名・成分・薬効クラスを、一般名の場合は代表的な商品名を補足してください。
+                        入力文字列: 「{search_drug_names}」
 
-                        ### 1. 💊 基本プロファイル（一般名・成分名 / 代表的商品名 / 薬効クラス・主な効能）
-                        ### 2. ⚠️ 腎機能(eGFR)・肝機能・病態に伴う投与注意・禁忌・用量調整基準
-                        ### 3. 🚨 主な副作用リスク・臨床上の警戒点（電解質異常、水分貯留、転倒、出血、血圧低下等）
-                        ### 4. 📈 臨床で監視すべき必須モニタリング項目（血液検査値・バイタル・自覚症状・尿量等）
+                        【🚨 最重要ルール】
+                        1. **勝手な名称補正の禁止:** 文字の響きが似ていても別の薬に置き換えないでください。点滴輸液（ペンライブ注等）・注射薬・外用薬も正確に同定してください。
+                        2. **簡潔な2項目出力:** 現場で素早く確認できるよう、各薬剤について「1. 基本プロファイル」「2. 主な副作用・臨床上の警戒点」の2項目のみを簡潔に出力してください。
+                        3. **自動振り分け分類の実行:** 最後に必ず、解説した全薬剤が以下の【分類対象グループ(12選)】のどれに該当するかを判断し、文章の最下部に「【分類結果タグ】: グループ名1, グループ名2...」という形式で正確なグループ文字列を出力してください（複数該当可。輸液や胃薬などどれにも該当しない薬は除外し、該当するもののみ記載）。
+
+                        【分類対象グループ(12選)の正確な文字列】
+                        {group_list_str}
+
+                        【出力フォーマット例】
+                        ### 💊 [入力された薬名1 / 一般名]
+                        - **基本プロファイル:** [一般名・薬効クラス・主な効能]
+                        - **主な副作用・警戒点:** [電解質異常、転倒、出血など臨床で注意すべき要点]
+
+                        ### 💊 [入力された薬名2 / 一般名]
+                        ...
+                        ---
+                        【分類結果タグ】: DOAC (直接経口抗凝固薬), β遮断薬, NSAIDs (解熱鎮痛剤)
                         """
                         
                         res_drug = client_search.models.generate_content(
                             model="gemini-3.5-flash",
                             contents=[drug_prompt]
                         )
-                        st.info(f"💡 **「{search_drug_name}」のAI臨床薬理プロファイル**")
-                        st.markdown(res_drug.text)
+                        response_text = res_drug.text
+                        
+                        # --- 分類結果を解析して、下部のチェックボックスへ自動登録！ ---
+                        found_groups = []
+                        for group in DRUG_GROUPS:
+                            if "【分類結果タグ】" in response_text:
+                                tag_part = response_text.split("【分類結果タグ】")[-1]
+                                if group in tag_part:
+                                    found_groups.append(group)
+                            elif group in response_text: # 万が一タグがない場合の予備判断
+                                found_groups.append(group)
+                        
+                        if found_groups:
+                            # 既存のチェック状態と合体させて重複を排除し、セッションに保存！
+                            current_selected = st.session_state.get("selected_med_groups", [])
+                            st.session_state["selected_med_groups"] = list(set(current_selected + found_groups))
+                            st.success(f"🎯 **自動振り分け成功！** 以下のグループを下部のチェックボックスへ自動登録しました:\n\n**{', '.join(found_groups)}**")
+                        else:
+                            st.info("💡 検索した薬剤の中に、下部の主要12グループに該当するものはありませんでした（輸液や一般胃薬など）。薬効情報のみ表示します。")
+                        
+                        # 画面にはタグより前の「薬の解説部分」だけを綺麗に表示
+                        display_text = response_text.split("【分類結果タグ】")[0].strip()
+                        st.markdown(display_text)
                         st.markdown("---")
                     except Exception as e:
                         st.error(f"❌ 検索中にエラーが発生しました: {e}")
 
-    # --- これまで通りのアセスメント用・服用中薬剤選択 ---
+    # --- アセスメント用・服用中薬剤選択 ---
     st.markdown("##### 📋 統合アセスメント(Step2)用の服用中薬剤登録")
-    st.caption("※患者さんが現在服用中の薬剤グループを選択してください。下部のStep2実行時にAIが病態と照合します。")
+    st.caption("※上のAI検索でヒットした主要薬剤グループは自動でここにチェックが入ります！必要に応じて手動で追加・解除も可能です。")
+    
+    # key="selected_med_groups" を繋ぐことで、AI検索の振り分け結果が即座にチェック状態になって反映される！
     meds_list = st.multiselect(
         "服用中の主要薬剤グループ (複数選択可)",
-        [
-            "ACE阻害薬 / ARB / ARNI", "β遮断薬", "MRA (ミネラルコルチコイド受容体拮抗薬)",
-            "ループ利尿薬 / サイアジド系", "SGLT2阻害薬", "DOAC (直接経口抗凝固薬)",
-            "ワルファリン", "抗血小板薬 (アスピリン/クロピドグレル等)", "スタチン / 脂質低下薬", "ジギタリス製剤", "抗不整脈薬", "NSAIDs (解熱鎮痛剤)"
-        ]
+        options=DRUG_GROUPS,
+        key="selected_med_groups"
     )
     meds_memo = st.text_input("気になる併用薬・用量・直近の変更等があれば記載 (任意)", placeholder="例: 直近でビソプロロール0.625mg開始、スピロノラクトン増量")
-
+    
 # =========================================================
 # タブ5：運動・リハビリ情報 (新規追加！)
 # =========================================================
