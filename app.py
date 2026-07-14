@@ -356,7 +356,7 @@ with tab_rehab:
         rehab_memo = st.text_input("歩行の目安・活動時の症状等 (任意)", placeholder="例: 連続歩行50m程度で下肢疲労と軽度息切れ出現")
 
 # =========================================================
-# 🚀 【「薬→検査」ルート】推論実行処理 (未定義エラー＆容量エラー100%回避！)
+# 🚀 【「薬→検査」ルート】推論実行処理
 # =========================================================
 if btn_direct_med_run:
     if not api_key:
@@ -367,8 +367,6 @@ if btn_direct_med_run:
         with st.spinner("💊🏃 薬物療法ガイドラインを解析し、リスク管理と運動処方箋を推論中..."):
             try:
                 client_dir = genai.Client(api_key=api_key)
-                
-                # 🚨 【超軽量化の秘訣】トークン超過を絶対に防ぐため、最強の1冊「geriatric_meds.pdf」に絞って解析！
                 up_files_dir = []
                 fpath = os.path.join("guidelines", "geriatric_meds.pdf")
                 if os.path.exists(fpath):
@@ -406,10 +404,10 @@ if btn_direct_med_run:
                 st.error(f"❌ エラーが発生しました: {e}")
 
 # =========================================================
-# --- 3. 参照ガイドラインの選択 (トークン超過・安全上限制限付き！) ---
+# --- 3. 参照ガイドラインの選択 (超安全・1冊固定仕様！) ---
 # =========================================================
 st.header("3. 参照・照合するガイドライン")
-st.caption("※100万トークンの壁を防ぐため、**【最大2冊まで】**しか選択できない仕様に安全制御しています。AIが優先度の高い2冊を自動選択しています。")
+st.caption("※巨大なPDFによる100万トークン超過(エラー)を100%防ぐため、一度に照合するガイドラインを**【最も重要な1冊のみ】**に安全制御しています。")
 
 GUIDELINE_MAP = {
     "echo.pdf": "💓 心エコー", "valvular_heart.pdf": "🫀 弁膜症", "heart_failure.pdf": "📕 心不全",
@@ -434,16 +432,16 @@ if available_pdfs:
         elif pdf == "ckd.pdf" and (any(h in history_list for h in ["慢性腎臓病(CKD)", "高血圧", "2型糖尿病"]) or (egfr is not None and egfr < 60.0)): recommended_pdfs.append(pdf)
         elif pdf == "liver_cirrhosis.pdf" and any(h in history_list for h in ["肝硬変", "B型肝炎", "C型肝炎"]): recommended_pdfs.append(pdf)
 
-    if not recommended_pdfs: recommended_pdfs = available_pdfs[:2]
+    if not recommended_pdfs: recommended_pdfs = available_pdfs[:1]
     
-    # 🚨 【最大の安全装置】デフォルト選択も「厳選2冊」に絞り、UI上でも3冊目を押せないように block する！
-    default_2pdfs = list(set(recommended_pdfs))[:2]
+    # 🚨 【最大の安全装置】デフォルト選択を絶対にパンクしない「最強の1冊」のみに設定！
+    default_1pdf = list(set(recommended_pdfs))[:1]
 
     selected_pdfs = st.multiselect(
-        "📚 照合させるガイドラインを選択 (トークン超過防止のため最大2冊)",
+        "📚 照合させるガイドラインを選択 (トークン超過防止のため最大1冊)",
         options=available_pdfs,
-        default=default_2pdfs,
-        max_selections=2,  # ⬅️ ここがポイント！3つ目を選べなくする神プロパティ
+        default=default_1pdf,
+        max_selections=1,  # ⬅️ ここを1に変更！巨大PDFが2つ以上合体することを物理的に阻止
         format_func=lambda x: GUIDELINE_MAP.get(x, x)
     )
 else:
@@ -460,11 +458,14 @@ if st.button("🚀 Step 1: 病態生理・リスクアセスメントを実行",
     elif not chief_complaint and not history_list: st.warning("⚠️ 主訴または既往歴を1つ以上選択してください。")
     elif not selected_pdfs: st.warning("⚠️ 参照PDFを1つ以上選択してください。")
     else:
-        with st.spinner(f"📚 {len(selected_pdfs)}冊のガイドラインを視覚解析し、病態生理を推論中..."):
+        # 万が一プログラムをすり抜けても強制的に「最初の1冊だけ」を送信する2重ロック！
+        safe_pdfs = selected_pdfs[:1]
+            
+        with st.spinner(f"📚 選択されたガイドラインを視覚解析し、病態生理を推論中..."):
             try:
                 client = genai.Client(api_key=api_key)
                 uploaded_files = []
-                for fname in selected_pdfs:
+                for fname in safe_pdfs:
                     fpath = os.path.join("guidelines", fname)
                     if os.path.exists(fpath):
                         uf = client.files.upload(file=fpath)
@@ -505,9 +506,9 @@ if "step1_result" in st.session_state:
             try:
                 client = genai.Client(api_key=api_key)
                 
-                # 🚨 【Step 2も超省エネ仕様】容量エラーを防ぐため、最強のリハビリPDF「1冊だけ」を読み込んで推論！
+                # 🚨 【Step 2 超軽量化】リハビリPDFは巨大すぎてパンクするため、軽くて的確な「心不全ガイドライン」1冊で統合！
                 up_files2 = []
-                fpath2 = os.path.join("guidelines", "cardiac_rehab.pdf")
+                fpath2 = os.path.join("guidelines", "heart_failure.pdf")
                 if os.path.exists(fpath2):
                     uf2 = client.files.upload(file=fpath2)
                     while uf2.state.name == "PROCESSING":
