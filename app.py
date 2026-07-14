@@ -55,14 +55,14 @@ tab_echo, tab_blood, tab_carotid, tab_med, tab_rehab = st.tabs([
 # =========================================================
 with tab_echo:
     st.subheader("心臓超音波検査 (Echo)")
-    with st.expander("➕ AoD・LAD", expanded=True):
+    with st.expander("➕ AoD・LAD 欄", expanded=True):
         c_aod1, c_aod2 = st.columns(2)
         with c_aod1:
             aod = st.number_input("AoD (mm)", value=None, placeholder="目安: 30.0", step=1.0)
         with c_aod2:
             lad = st.number_input("LAD (mm)", value=None, placeholder="目安: 35.0", step=1.0)
 
-    with st.expander("➕ Mitral valve (DDR, Prolapse, SAM)"):
+    with st.expander("➕ Mitral valve 欄 (DDR, Prolapse, SAM)"):
         c_mv1, c_mv2, c_mv3 = st.columns(3)
         with c_mv1:
             ddr = st.selectbox("DDR", ["正常・良好", "低下", "著明低下"], index=None, placeholder="選択なし")
@@ -71,7 +71,7 @@ with tab_echo:
         with c_mv3:
             sam = st.selectbox("SAM", ["なし (-)", "あり (+)"], index=None, placeholder="選択なし")
 
-    with st.expander("➕ LV size function (IVS, LVPW, LVDd/s, SV, Co, CI, HR, EF, FS)"):
+    with st.expander("➕ LV size function 欄 (IVS, LVPW, LVDd/s, SV, Co, CI, HR, EF, FS)"):
         c_lv1, c_lv2 = st.columns(2)
         with c_lv1:
             ivs = st.number_input("IVS Thickness (mm)", value=None, placeholder="目安: 10.0", step=0.5)
@@ -86,7 +86,7 @@ with tab_echo:
             ef = st.number_input("EF (%)", value=None, placeholder="目安: 60.0", step=1.0)
             fs = st.number_input("FS (%)", value=None, placeholder="目安: 35.0", step=1.0)
 
-    with st.expander("➕ Doppler Measurements Flow Velocity (E, A, E/A, D-time, E/E', LVOT)"):
+    with st.expander("➕ Doppler Measurements Flow Velocity 欄 (E, A, E/A, D-time, E/E', LVOT)"):
         c_dop1, c_dop2 = st.columns(2)
         with c_dop1:
             mitral_e = st.number_input("Mitral E (m/s)", value=None, placeholder="目安: 0.70", step=0.05)
@@ -97,7 +97,7 @@ with tab_echo:
             e_e_prime = st.number_input("E/E'", value=None, placeholder="目安: 8.8", step=0.5)
             lvot = st.number_input("LVOT (m/s)", value=None, placeholder="目安: 1.00", step=0.05)
 
-    with st.expander("➕ Regurgitation (逆流・狭窄・弁口面積等)"):
+    with st.expander("➕ Regurgitation 欄 (逆流・狭窄・弁口面積等)"):
         c_reg1, c_reg2 = st.columns(2)
         with c_reg1:
             ar = st.selectbox("AR", ["なし/極軽度 (-)", "軽度 (+)", "中等度 (++)", "高度 (+++)"], index=None, placeholder="選択なし")
@@ -112,7 +112,7 @@ with tab_echo:
             la_lv_pg = st.number_input("LA-LVPG (mmHg)", value=None, placeholder="目安: 5.0", step=1.0)
             mva = st.number_input("MVA (cm²)", value=None, placeholder="目安: 4.0", step=0.1)
 
-    with st.expander("➕ その他 (心内血栓, PE, 呼吸変動, 胸水, IVC径)"):
+    with st.expander("➕ その他 欄 (心内血栓, PE, 呼吸変動, 胸水, IVC径)"):
         c_oth1, c_oth2 = st.columns(2)
         with c_oth1:
             thrombus = st.selectbox("心内血栓", ["なし (-)", "あり (+)"], index=None, placeholder="選択なし")
@@ -123,7 +123,7 @@ with tab_echo:
             ivc_diam = st.number_input("IVC径 (mm)", value=None, placeholder="目安: 14.0", step=1.0)
 
 # =========================================================
-# タブ2：血液検査 (現場の検査シート完全準拠・並び替え版)
+# タブ2：血液検査 (現場の検査シート完全準拠・順番並行版)
 # =========================================================
 with tab_blood:
     st.subheader("🩸 血液・生化学検査")
@@ -258,7 +258,7 @@ with tab_carotid:
             lt_ica_ri = st.number_input("Lt-ICA RI", value=None, placeholder="目安: 0.66", step=0.02)
 
 # =========================================================
-# タブ4：薬剤情報 (効果発現時間追加＆「薬→検査」ルート対応)
+# タブ4：薬剤情報
 # =========================================================
 with tab_med:
     st.subheader("💊 薬剤情報・リスク管理")
@@ -290,7 +290,6 @@ with tab_med:
                         client_search = genai.Client(api_key=api_key)
                         group_list_str = "、".join(DRUG_GROUPS)
                         
-                        # 効果発現時間(Tmax等)の出力と、自己補正防止・自動分類プロンプト
                         drug_prompt = f"""
                         あなたは日本国内の医薬品に精通した臨床薬理の専門家および病棟薬剤師です。
                         入力された薬剤リストについて、各薬のプロファイル（効果発現時間を含む）と副作用を簡潔にまとめ、主要薬剤グループへの自動分類を行ってください。
@@ -338,57 +337,12 @@ with tab_med:
     meds_list = st.multiselect("服用中の主要薬剤グループ (複数選択可)", options=DRUG_GROUPS, key="selected_med_groups")
     meds_memo = st.text_input("気になる併用薬・用量・直近の変更等があれば記載 (任意)", placeholder="例: 直近でビソプロロール0.625mg開始")
     
-    # --- 🚀 【新設：「薬→検査」ルート】ここで直接、薬剤＆リハビリの処方アセスメントを回せる！ ---
     st.markdown("---")
     st.markdown("##### 🚀 薬剤・運動処方アセスメントのダイレクト実行")
-    st.caption("※「薬から先に調べたい」方は、ここからボタン1つで現在入力されている検査値（eGFR・K値等）と統合した安全管理・運動ガイドを生成できます！")
+    st.caption("※「薬から先に調べたい」方は、こちらのボタンから実行できます！結果は画面下部に分かりやすく出力されます。")
     
-    if st.button("💊🏃 現在の処方薬・運動情報と検査値を統合して処方・リスクアセスメントを実行", use_container_width=True, type="primary"):
-        if not api_key:
-            st.error("⚠️ APIキーが設定されていません。")
-        elif not meds_list and not meds_memo:
-            st.warning("⚠️ 服用薬グループが選択されていないか、メモが空です。薬を検索・選択してください。")
-        else:
-            with st.spinner("💊🏃 選択された薬剤と現在の検査数値を照合し、リスク管理と運動処方箋を推論中..."):
-                try:
-                    client_dir = genai.Client(api_key=api_key)
-                    # 薬・運動系の必須PDFとCKD・心不全PDFをピックアップして照合
-                    dir_pdfs = ["geriatric_meds.pdf", "cardiac_rehab.pdf", "antithrombotic.pdf", "ckd.pdf", "heart_failure.pdf"]
-                    up_files_dir = []
-                    for fname in dir_pdfs:
-                        fpath = os.path.join("guidelines", fname)
-                        if os.path.exists(fpath):
-                            uf = client_dir.files.upload(file=fpath)
-                            while uf.state.name == "PROCESSING":
-                                time.sleep(2)
-                                uf = client_dir.files.get(name=uf.name)
-                            up_files_dir.append(uf)
-                    
-                    meds_str = "、".join(meds_list) if meds_list else "選択なし"
-                    history_str = "、".join(history_list) if history_list else "特記事項なし"
-                    
-                    prompt_dir = f"""
-                    あなたは臨床経験・薬理・リハビリの知識が極めて豊富な医療従事者です。
-                    添付ガイドラインを参照し、現在の【服用薬剤・身体機能】と【患者の検査データ（特にeGFRや電解質、心拍数等）】を統合して、安全管理提言と運動処方箋を作成してください。
-
-                    【患者基本・臨床情報】
-                    年齢/性別: {age}歳 {sex} / 血圧: {fmt(sys_bp)}/{fmt(dia_bp)} / 心拍数: {fmt(hr_val,'bpm')} ({rhythm}) / 既往歴: {history_str}
-                    ・服用薬グループ: {meds_str} / 薬剤メモ: {fmt(meds_memo)}
-                    ・ADL: {fmt(adl_status)} / 自覚症状(NYHA): {fmt(nyha)} / フレイル: {fmt(frail_status)} / 歩行・リハビリメモ: {fmt(rehab_memo)}
-                    ・重要検査値: eGFR={fmt(egfr)}, K={fmt(k,'mEq/L')}, Na={fmt(na,'mEq/L')}, PLT={fmt(plt,'万/μL')}, Hb={fmt(hb,'g/dL')}, Alb={fmt(alb,'g/dL')}, EF={fmt(ef,'%')}
-
-                    以下の2見出し(Markdown)で実践的に出力してください。
-                    ### 1. 💊 薬剤情報からの安全管理・副作用モニタリング提言 (現在の腎機能やK値、用量注意と警戒サイン)
-                    ### 2. 🏃 個体別の「運動療法処方箋」と「最警戒・中止基準」
-                    """
-                    res_dir = client_dir.models.generate_content(model="gemini-3.5-flash", contents=up_files_dir + [prompt_dir])
-                    st.success("🎉 薬剤・運動療法のダイレクト統合アセスメント完了！")
-                    st.markdown(res_dir.text)
-                    for uf in up_files_dir:
-                        try: client_dir.files.delete(name=uf.name)
-                        except Exception: pass
-                except Exception as e:
-                    st.error(f"❌ エラーが発生しました: {e}")
+    # ⚠️【未定義エラー防止のからくり！】ここでは「ボタンの表示」だけを行い、計算処理はタブ5の後に移動させました！
+    btn_direct_med_run = st.button("💊🏃 現在の処方薬・運動情報と検査値を統合して処方・リスクアセスメントを実行", use_container_width=True, type="primary")
 
 # =========================================================
 # タブ5：運動・リハビリ情報
@@ -402,6 +356,57 @@ with tab_rehab:
     with c_reh2:
         frail_status = st.selectbox("フレイル・サルコペニア評価", ["明らかな低下なし", "プレフレイル疑い", "フレイル / 著明な筋力低下あり"], index=None, placeholder="選択してください")
         rehab_memo = st.text_input("歩行の目安・活動時の症状等 (任意)", placeholder="例: 連続歩行50m程度で下肢疲労と軽度息切れ出現")
+
+# =========================================================
+# 🚀 【新設：「薬→検査」ルート】推論実行処理
+# （※すべてのタブ変数が確実に読まれたこの位置で実行するため、絶対にエラーになりません！）
+# =========================================================
+if btn_direct_med_run:
+    if not api_key:
+        st.error("⚠️ APIキーが設定されていません。")
+    elif not meds_list and not meds_memo:
+        st.warning("⚠️ 服用薬グループが選択されていないか、メモが空です。薬を検索・選択してください。")
+    else:
+        with st.spinner("💊🏃 選択された薬剤と現在の検査数値・ADLを照合し、リスク管理と運動処方箋を推論中..."):
+            try:
+                client_dir = genai.Client(api_key=api_key)
+                dir_pdfs = ["geriatric_meds.pdf", "cardiac_rehab.pdf", "antithrombotic.pdf", "ckd.pdf", "heart_failure.pdf"]
+                up_files_dir = []
+                for fname in dir_pdfs:
+                    fpath = os.path.join("guidelines", fname)
+                    if os.path.exists(fpath):
+                        uf = client_dir.files.upload(file=fpath)
+                        while uf.state.name == "PROCESSING":
+                            time.sleep(2)
+                            uf = client_dir.files.get(name=uf.name)
+                        up_files_dir.append(uf)
+                
+                meds_str = "、".join(meds_list) if meds_list else "選択なし"
+                history_str = "、".join(history_list) if history_list else "特記事項なし"
+                
+                prompt_dir = f"""
+                あなたは臨床経験・薬理・リハビリの知識が極めて豊富な医療従事者です。
+                添付ガイドラインを参照し、現在の【服用薬剤・身体機能】と【患者の検査データ】を統合して、安全管理提言と運動処方箋を作成してください。
+
+                【患者基本・臨床情報】
+                年齢/性別: {age}歳 {sex} / 血圧: {fmt(sys_bp)}/{fmt(dia_bp)} / 心拍数: {fmt(hr_val,'bpm')} ({rhythm}) / 既往歴: {history_str}
+                ・服用薬グループ: {meds_str} / 薬剤メモ: {fmt(meds_memo)}
+                ・ADL: {fmt(adl_status)} / 自覚症状(NYHA): {fmt(nyha)} / フレイル: {fmt(frail_status)} / 歩行・リハビリメモ: {fmt(rehab_memo)}
+                ・重要検査値: eGFR={fmt(egfr)}, K={fmt(k,'mEq/L')}, Na={fmt(na,'mEq/L')}, PLT={fmt(plt,'万/μL')}, Hb={fmt(hb,'g/dL')}, Alb={fmt(alb,'g/dL')}, EF={fmt(ef,'%')}
+
+                以下の2見出し(Markdown)で実践的に出力してください。
+                ### 1. 💊 薬剤情報からの安全管理・副作用モニタリング提言 (現在の腎機能やK値、用量注意と警戒サイン)
+                ### 2. 🏃 個体別の「運動療法処方箋」と「最警戒・中止基準」
+                """
+                res_dir = client_dir.models.generate_content(model="gemini-3.5-flash", contents=up_files_dir + [prompt_dir])
+                st.success("🎉 「薬→検査」ルートでのダイレクト統合アセスメント完了！")
+                st.markdown(res_dir.text)
+                st.markdown("---")
+                for uf in up_files_dir:
+                    try: client_dir.files.delete(name=uf.name)
+                    except Exception: pass
+            except Exception as e:
+                st.error(f"❌ エラーが発生しました: {e}")
 
 # =========================================================
 # --- 3. 参照ガイドラインの選択 (トークン超過自動ガード付き！) ---
@@ -436,7 +441,6 @@ if available_pdfs:
         elif pdf == "antithrombotic.pdf" and any(m in meds_list for m in ["DOAC (直接経口抗凝固薬)", "ワルファリン"]): recommended_pdfs.append(pdf)
 
     if not recommended_pdfs: recommended_pdfs = available_pdfs[:3]
-    # トークン超過を防ぐため推奨自体も最大5冊に絞る
     recommended_pdfs = list(set(recommended_pdfs))[:5]
 
     selected_pdfs = st.multiselect("📚 照合させるガイドラインを選択 (最大6冊推奨)", options=available_pdfs, default=recommended_pdfs, format_func=lambda x: GUIDELINE_MAP.get(x, x))
@@ -444,21 +448,19 @@ else:
     selected_pdfs = []
 
 # =========================================================
-# --- 4. 統合アセスメント実行 (トークン自動調整・安全ガードつき) ---
+# --- 4. 統合アセスメント実行 ---
 # =========================================================
 st.markdown("---")
 st.header("4. 統合アセスメント実行")
 
-# 【「検査→薬」ルート】従来の病態生理アセスメント
 if st.button("🚀 Step 1: 病態生理・リスクアセスメントを実行", use_container_width=True, type="primary"):
     if not api_key: st.error("⚠️ APIキーが設定されていません。")
     elif not chief_complaint and not history_list: st.warning("⚠️ 主訴または既往歴を1つ以上選択してください。")
     elif not selected_pdfs: st.warning("⚠️ 参照PDFを1つ以上選択してください。")
     else:
-        # 🚨 【100万トークンの壁・自動防御システム】万が一ユーザーが7冊以上選んでいても勝手に上位6冊に絞ってエラーを100%防ぐ！
         safe_pdfs = selected_pdfs[:6]
         if len(selected_pdfs) > 6:
-            st.warning(f"⚠️ 選択されたPDFが {len(selected_pdfs)}冊 と多すぎるため、容量超過(100万トークンエラー)を防ぐ目的で、優先度の高い上位6冊に自動絞り込みして推論を実行します。")
+            st.warning(f"⚠️ 選択されたPDFが {len(selected_pdfs)}冊 と多すぎるため、容量超過を防ぐ目的で、優先度の高い上位6冊に自動絞り込みして推論を実行します。")
             
         with st.spinner(f"📚 {len(safe_pdfs)}冊のガイドラインを視覚解析し、病態生理を推論中..."):
             try:
@@ -504,7 +506,6 @@ if "step1_result" in st.session_state:
         with st.spinner("💊🏃 病態を引き継ぎ、処方薬リスクと運動メニューを推論中..."):
             try:
                 client = genai.Client(api_key=api_key)
-                # Step2では治療・介入系を中心に安全な5冊に固定！これで容量オーバーゼロ！
                 step2_pdfs = ["cardiac_rehab.pdf", "geriatric_meds.pdf", "antithrombotic.pdf", "heart_failure.pdf", "ckd.pdf"]
                 up_files2 = []
                 for fname in step2_pdfs:
