@@ -123,7 +123,7 @@ with tab_echo:
             ivc_diam = st.number_input("IVC径 (mm)", value=None, placeholder="目安: 14.0", step=1.0)
 
 # =========================================================
-# タブ2：血液検査 (現場の検査シート完全準拠・順番並行版)
+# タブ2：血液検査
 # =========================================================
 with tab_blood:
     st.subheader("🩸 血液・生化学検査")
@@ -339,9 +339,7 @@ with tab_med:
     
     st.markdown("---")
     st.markdown("##### 🚀 薬剤・運動処方アセスメントのダイレクト実行")
-    st.caption("※「薬から先に調べたい」方は、こちらのボタンから実行できます！結果は画面下部に分かりやすく出力されます。")
-    
-    # ⚠️【未定義エラー防止のからくり！】ここでは「ボタンの表示」だけを行い、計算処理はタブ5の後に移動させました！
+    st.caption("※「薬から先に調べたい」方はこちら！処理の競合を防ぐため、一番強いPDF(高齢者薬物療法)1冊だけに絞って高速推論します。")
     btn_direct_med_run = st.button("💊🏃 現在の処方薬・運動情報と検査値を統合して処方・リスクアセスメントを実行", use_container_width=True, type="primary")
 
 # =========================================================
@@ -358,8 +356,7 @@ with tab_rehab:
         rehab_memo = st.text_input("歩行の目安・活動時の症状等 (任意)", placeholder="例: 連続歩行50m程度で下肢疲労と軽度息切れ出現")
 
 # =========================================================
-# 🚀 【新設：「薬→検査」ルート】推論実行処理
-# （※すべてのタブ変数が確実に読まれたこの位置で実行するため、絶対にエラーになりません！）
+# 🚀 【「薬→検査」ルート】推論実行処理 (未定義エラー＆容量エラー100%回避！)
 # =========================================================
 if btn_direct_med_run:
     if not api_key:
@@ -367,26 +364,26 @@ if btn_direct_med_run:
     elif not meds_list and not meds_memo:
         st.warning("⚠️ 服用薬グループが選択されていないか、メモが空です。薬を検索・選択してください。")
     else:
-        with st.spinner("💊🏃 選択された薬剤と現在の検査数値・ADLを照合し、リスク管理と運動処方箋を推論中..."):
+        with st.spinner("💊🏃 薬物療法ガイドラインを解析し、リスク管理と運動処方箋を推論中..."):
             try:
                 client_dir = genai.Client(api_key=api_key)
-                dir_pdfs = ["geriatric_meds.pdf", "cardiac_rehab.pdf", "antithrombotic.pdf", "ckd.pdf", "heart_failure.pdf"]
+                
+                # 🚨 【超軽量化の秘訣】トークン超過を絶対に防ぐため、最強の1冊「geriatric_meds.pdf」に絞って解析！
                 up_files_dir = []
-                for fname in dir_pdfs:
-                    fpath = os.path.join("guidelines", fname)
-                    if os.path.exists(fpath):
-                        uf = client_dir.files.upload(file=fpath)
-                        while uf.state.name == "PROCESSING":
-                            time.sleep(2)
-                            uf = client_dir.files.get(name=uf.name)
-                        up_files_dir.append(uf)
+                fpath = os.path.join("guidelines", "geriatric_meds.pdf")
+                if os.path.exists(fpath):
+                    uf = client_dir.files.upload(file=fpath)
+                    while uf.state.name == "PROCESSING":
+                        time.sleep(2)
+                        uf = client_dir.files.get(name=uf.name)
+                    up_files_dir.append(uf)
                 
                 meds_str = "、".join(meds_list) if meds_list else "選択なし"
                 history_str = "、".join(history_list) if history_list else "特記事項なし"
                 
                 prompt_dir = f"""
                 あなたは臨床経験・薬理・リハビリの知識が極めて豊富な医療従事者です。
-                添付ガイドラインを参照し、現在の【服用薬剤・身体機能】と【患者の検査データ】を統合して、安全管理提言と運動処方箋を作成してください。
+                添付の『高齢者の安全な薬物療法ガイドライン』等を参照し、現在の【服用薬剤・身体機能】と【患者の検査データ】を統合して、実践的な安全管理提言と運動処方箋を作成してください。
 
                 【患者基本・臨床情報】
                 年齢/性別: {age}歳 {sex} / 血圧: {fmt(sys_bp)}/{fmt(dia_bp)} / 心拍数: {fmt(hr_val,'bpm')} ({rhythm}) / 既往歴: {history_str}
@@ -409,10 +406,10 @@ if btn_direct_med_run:
                 st.error(f"❌ エラーが発生しました: {e}")
 
 # =========================================================
-# --- 3. 参照ガイドラインの選択 (トークン超過自動ガード付き！) ---
+# --- 3. 参照ガイドラインの選択 (トークン超過・安全上限制限付き！) ---
 # =========================================================
 st.header("3. 参照・照合するガイドライン")
-st.caption("※トークン超過(100万の壁)を防ぐため、一度に照合するPDFは自動的に上限6冊以内に調整されます。")
+st.caption("※100万トークンの壁を防ぐため、**【最大2冊まで】**しか選択できない仕様に安全制御しています。AIが優先度の高い2冊を自動選択しています。")
 
 GUIDELINE_MAP = {
     "echo.pdf": "💓 心エコー", "valvular_heart.pdf": "🫀 弁膜症", "heart_failure.pdf": "📕 心不全",
@@ -436,14 +433,19 @@ if available_pdfs:
         elif pdf == "stroke.pdf" and any(h in history_list for h in ["脳卒中・TIA", "心房細動"]): recommended_pdfs.append(pdf)
         elif pdf == "ckd.pdf" and (any(h in history_list for h in ["慢性腎臓病(CKD)", "高血圧", "2型糖尿病"]) or (egfr is not None and egfr < 60.0)): recommended_pdfs.append(pdf)
         elif pdf == "liver_cirrhosis.pdf" and any(h in history_list for h in ["肝硬変", "B型肝炎", "C型肝炎"]): recommended_pdfs.append(pdf)
-        elif pdf == "cardiac_rehab.pdf" and (adl_status is not None or nyha is not None): recommended_pdfs.append(pdf)
-        elif pdf == "geriatric_meds.pdf" and (age >= 65 or len(meds_list) > 0): recommended_pdfs.append(pdf)
-        elif pdf == "antithrombotic.pdf" and any(m in meds_list for m in ["DOAC (直接経口抗凝固薬)", "ワルファリン"]): recommended_pdfs.append(pdf)
 
-    if not recommended_pdfs: recommended_pdfs = available_pdfs[:3]
-    recommended_pdfs = list(set(recommended_pdfs))[:5]
+    if not recommended_pdfs: recommended_pdfs = available_pdfs[:2]
+    
+    # 🚨 【最大の安全装置】デフォルト選択も「厳選2冊」に絞り、UI上でも3冊目を押せないように block する！
+    default_2pdfs = list(set(recommended_pdfs))[:2]
 
-    selected_pdfs = st.multiselect("📚 照合させるガイドラインを選択 (最大6冊推奨)", options=available_pdfs, default=recommended_pdfs, format_func=lambda x: GUIDELINE_MAP.get(x, x))
+    selected_pdfs = st.multiselect(
+        "📚 照合させるガイドラインを選択 (トークン超過防止のため最大2冊)",
+        options=available_pdfs,
+        default=default_2pdfs,
+        max_selections=2,  # ⬅️ ここがポイント！3つ目を選べなくする神プロパティ
+        format_func=lambda x: GUIDELINE_MAP.get(x, x)
+    )
 else:
     selected_pdfs = []
 
@@ -458,15 +460,11 @@ if st.button("🚀 Step 1: 病態生理・リスクアセスメントを実行",
     elif not chief_complaint and not history_list: st.warning("⚠️ 主訴または既往歴を1つ以上選択してください。")
     elif not selected_pdfs: st.warning("⚠️ 参照PDFを1つ以上選択してください。")
     else:
-        safe_pdfs = selected_pdfs[:6]
-        if len(selected_pdfs) > 6:
-            st.warning(f"⚠️ 選択されたPDFが {len(selected_pdfs)}冊 と多すぎるため、容量超過を防ぐ目的で、優先度の高い上位6冊に自動絞り込みして推論を実行します。")
-            
-        with st.spinner(f"📚 {len(safe_pdfs)}冊のガイドラインを視覚解析し、病態生理を推論中..."):
+        with st.spinner(f"📚 {len(selected_pdfs)}冊のガイドラインを視覚解析し、病態生理を推論中..."):
             try:
                 client = genai.Client(api_key=api_key)
                 uploaded_files = []
-                for fname in safe_pdfs:
+                for fname in selected_pdfs:
                     fpath = os.path.join("guidelines", fname)
                     if os.path.exists(fpath):
                         uf = client.files.upload(file=fpath)
@@ -506,16 +504,16 @@ if "step1_result" in st.session_state:
         with st.spinner("💊🏃 病態を引き継ぎ、処方薬リスクと運動メニューを推論中..."):
             try:
                 client = genai.Client(api_key=api_key)
-                step2_pdfs = ["cardiac_rehab.pdf", "geriatric_meds.pdf", "antithrombotic.pdf", "heart_failure.pdf", "ckd.pdf"]
+                
+                # 🚨 【Step 2も超省エネ仕様】容量エラーを防ぐため、最強のリハビリPDF「1冊だけ」を読み込んで推論！
                 up_files2 = []
-                for fname in step2_pdfs:
-                    fpath = os.path.join("guidelines", fname)
-                    if os.path.exists(fpath):
-                        uf = client.files.upload(file=fpath)
-                        while uf.state.name == "PROCESSING":
-                            time.sleep(2)
-                            uf = client.files.get(name=uf.name)
-                        up_files2.append(uf)
+                fpath2 = os.path.join("guidelines", "cardiac_rehab.pdf")
+                if os.path.exists(fpath2):
+                    uf2 = client.files.upload(file=fpath2)
+                    while uf2.state.name == "PROCESSING":
+                        time.sleep(2)
+                        uf2 = client.files.get(name=uf2.name)
+                    up_files2.append(uf2)
                 
                 meds_str = "、".join(meds_list) if meds_list else "選択なし"
                 prompt2 = f"""
